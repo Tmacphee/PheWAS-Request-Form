@@ -10,6 +10,7 @@ ui <- dashboardPage(
   dashboardHeader(title = 'UK Biobank'),
   dashboardSidebar(
     sidebarMenu(
+      id = 'tabs',
       menuItem('PheWAS Regression Results', tabName = 'Results', icon = icon('table')),
       menuItem('Target Request', tabName = 'Request', icon = icon('file-alt'))
     )
@@ -24,7 +25,7 @@ ui <- dashboardPage(
                 br(),
                 fluidRow(
                   column(3, selectInput('target', label = 'Target:',
-                                        choices = gapminder$country, selected = 1)), # The choices from this widget will need to be pulled from list of already processed targets, database_name$targets will be the choices
+                                        choices = gapminder$country, selected = NULL)), # The choices from this widget will need to be pulled from list of already processed targets, database_name$targets will be the choices
                   column(3, numericInput('num', label = 'Minimum -log10(p):', value = 3, min = 3, max = 20, step = 1)),
                   column(3, selectInput('regression', label = 'Regression:', choices = list('Linear', 'Logistic'))),
                   column(2, actionButton('query', label = 'Query Results')),
@@ -55,7 +56,7 @@ ui <- dashboardPage(
                   textInput('man_targs', label = 'Enter Targets', placeholder = 'csv format')
                   # Will need some sort of check button to see if the targets are available, the '+' button in Kartiks app
                 ),
-                selectInput('sel_target', label = 'Select Target', choices = c('1', '2', '3'), selected = NULL),
+                selectInput('sel_target', label = 'Select Target', choices = gapminder$country, selected = NULL),
                 # use updateSelectInput in the server function to remove choices that have already been selected
                 DT::dataTableOutput('targetTable_2'),
                 actionButton('submit', label = 'Submit')
@@ -79,12 +80,27 @@ ui <- dashboardPage(
 #-------------------------------------------------------------------------------#
 
 server <- function(input, output) {
-  output$targetTable_1 <- DT::renderDataTable({
-    input$click
-    isolate({
-      targetFilter <- subset(gapminder, gapminder$country == input$target)
-      numFilter <- subset(gapminder, gapminder$population < input$num)
-      regFilter <- subset(gapminder, gapminder$fertility != input$regression)
+  
+  # Tab switch if target not found
+  observeEvent(input$click, {
+    newTab <- switch(input$tabs,
+                     'Request' = 'Results')
+    updateTabItems('tabs', newTab)
+  })
+  
+  # Regression Results DataTable
+  observeEvent(input$query, {
+    output$targetTable_1 <- DT::renderDataTable({
+      gapminder %>% filter(country == input$target 
+                           & population > input$num 
+                           & fertility != input$regression)
+    })
+  })
+  
+  # Target Selection DataTable
+  observeEvent(input$submit, {
+    output$targetTable_2 <- DT::renderDataTable({
+      gapminder %>% filter(country == input$sel_target)
     })
   })
 }
